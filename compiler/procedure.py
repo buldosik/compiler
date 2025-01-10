@@ -55,7 +55,6 @@ class Procedure():
         self.commands = []
         self.symbols = {}
         self.links = {}
-        self.consts = {}
 
     def set_commands(self, commands):
         self.commands = commands

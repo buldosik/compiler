@@ -1,5 +1,5 @@
 from procedure import Array, Link, Link_T, Variable
-from config import debug
+from config import debug, isStrict
 
 address_reg = 'f'
 value_reg = 'g'
@@ -26,6 +26,7 @@ class CodeGenerator:
     def gen_code_from_procedure(self, name, procedure_table):
         if debug:
             print(name)
+        self.loop_depth = 0
         self.procedure_table = procedure_table
         self.procedure = procedure_table[name]
         self.commands = self.procedure.commands
@@ -168,7 +169,9 @@ class CodeGenerator:
             self.check_condition(command[1], 'while_end')
 
             loop_start = self.get_current_line(withOffset=False)
+            self.loop_depth += 1
             self.gen_code_from_commands(command[2])
+            self.loop_depth -= 1
 
             self.code.append(f"JUMP {condition_start} # while condition")
 
@@ -180,7 +183,9 @@ class CodeGenerator:
         if debug:
             print("until")
         loop_start = self.get_current_line()
+        self.loop_depth += 1
         self.gen_code_from_commands(command[2])
+        self.loop_depth -= 1
 
         condition_start = self.get_current_line(withOffset=False)
         self.check_condition(command[1], 'loop_start')
@@ -692,7 +697,12 @@ class CodeGenerator:
                 if self.symbols[target].isInitialized:
                     self.load_variable(target, out_reg)
                 else:
-                    raise Exception(f"Variable {target} is not isInitialized")
+
+                    if not isStrict and self.loop_depth > 0:
+                        self.load_variable(target, out_reg)
+                        print(f"Warning: Variable {target} can be uninitialized")
+                    else:
+                        raise Exception(f"Variable {target} is uninitialized")
             else:
                 raise Exception(f"Assigning to array {target} with no index provided")
 
@@ -743,7 +753,10 @@ class CodeGenerator:
         
         if index[1] in self.symbols and type(self.symbols[index[1]]) == Variable:
             if not self.symbols[index[1]].isInitialized:
-                raise Exception(f"Trying to use {array_name}[{index[1]}] where variable {index[1]} is uninitialized")
+                if not isStrict and self.loop_depth > 0:
+                    print(f"Warning: Trying to use {array_name}[{index[1]}] where variable {index[1]} can be uninitialized")
+                else:
+                    raise Exception(f"Trying to use {array_name}[{index[1]}] where variable {index[1]} is uninitialized")
             self.load_variable(index[1], reg_h)
             var = self.procedure.get_variable(array_name)
             self.gen_const(var.memory_offset, 'a')
@@ -797,7 +810,10 @@ class CodeGenerator:
         
         if index[1] in self.symbols and type(self.symbols[index[1]]) == Variable:
             if not self.symbols[index[1]].isInitialized:
-                raise Exception(f"Trying to use {array_name}[{index[1]}] where variable {index[1]} is uninitialized")
+                if not isStrict and self.loop_depth > 0:
+                    print(f"Warning: Trying to use {array_name}[{index[1]}] where variable {index[1]} can be uninitialized")
+                else:
+                    raise Exception(f"Trying to use {array_name}[{index[1]}] where variable {index[1]} is uninitialized")
             self.load_variable(index[1], reg_h)
             var = self.procedure.get_variable(array_name)
             self.gen_const(var.memory_offset, 'a')

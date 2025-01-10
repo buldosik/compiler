@@ -67,7 +67,6 @@ class ImpParser(Parser):
     currentProcedure = Procedure(0)
     code = None
     procedureTable = ProcedureTable()
-    consts = set()
 
 #region Program_all
     @_('procedures main')
@@ -143,22 +142,19 @@ class ImpParser(Parser):
     @_('IF condition THEN commands ELSE commands ENDIF')
     def command(self, p):
         #print('2')
-        resp = "ifelse", p[1], p[3], p[5], self.consts.copy()
-        self.consts.clear()
+        resp = "ifelse", p[1], p[3], p[5]
         return resp
 
     @_('IF condition THEN commands ENDIF')
     def command(self, p):
         #print('3')
-        resp = "if", p[1], p[3], self.consts.copy()
-        self.consts.clear()
+        resp = "if", p[1], p[3]
         return resp
 
     @_('WHILE condition DO commands ENDWHILE')
     def command(self, p):
         #print('4')
-        resp = "while", p[1], p[3], self.consts.copy()
-        self.consts.clear()
+        resp = "while", p[1], p[3]
         return resp
 
     @_('REPEAT commands UNTIL condition ";"')
@@ -179,8 +175,6 @@ class ImpParser(Parser):
     @_('WRITE value ";"')
     def command(self, p):
         #print('7')
-        if p[1][0] == "const":
-            self.consts.add(int(p[1][1]))
         return "write", p[1]
 
 #endregion
