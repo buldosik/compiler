@@ -72,7 +72,7 @@ class ImpLexer(Lexer):
 
 class ImpParser(Parser):
     tokens = ImpLexer.tokens
-    currentProcedure = Procedure(0)
+    currentProcedure = Procedure(100)
     code = None
     procedureTable = ProcedureTable()
 

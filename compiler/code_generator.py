@@ -1,5 +1,5 @@
 from procedure import Array, Link, Link_T, Variable
-from config import debug, isStrict
+from config import isStrict, log_code
 
 address_reg = 'f'
 value_reg = 'g'
@@ -24,8 +24,7 @@ class CodeGenerator:
             self.code[i] = self.code[i].replace(text_to_replace, text)
 
     def gen_code_from_procedure(self, name, procedure_table):
-        if debug:
-            print(name)
+        log_code(2, name)
         self.loop_depth = 0
         self.procedure_table = procedure_table
         self.procedure = procedure_table[name]
@@ -72,8 +71,7 @@ class CodeGenerator:
 #region Command
 
     def command_write(self, command):
-        if debug:
-            print("Write")
+        log_code(2, "Write")
         value = command[1]
 
         if value[0] == "load":
@@ -85,8 +83,7 @@ class CodeGenerator:
         self.code.append(f"WRITE")
 
     def command_read(self, command):
-        if debug:
-            print("read")
+        log_code(2, "read")
         target = command[1]
 
         self.default_load_address(target, isInitialising=True)
@@ -95,8 +92,7 @@ class CodeGenerator:
         self.code.append(f"STORE {address_reg}")
 
     def command_assign(self, command):
-        if debug:
-            print("assign")
+        log_code(2, "assign")
         target = command[1]
 
         expression = command[2]
@@ -108,8 +104,7 @@ class CodeGenerator:
         self.code.append(f"STORE {address_reg}")
 
     def command_if(self, command):
-        if debug:
-            print("if")
+        log_code(2, "if")
         condition = self.simplify_condition(command[1])
         if isinstance(condition, bool):
             if condition:
@@ -125,8 +120,7 @@ class CodeGenerator:
             self.replace_line_with("if_finish", str(command_end) + " # endif", condition_start, command_start)
 
     def command_ifelse(self, command):
-        if debug:
-            print("ifelse")
+        log_code(2, "ifelse")
         condition = self.simplify_condition(command[1])
         if isinstance(condition, bool):
             if condition:
@@ -156,8 +150,7 @@ class CodeGenerator:
             #    self.code[i] = self.code[i].replace('finish', str(else_start))
 
     def command_while(self, command):
-        if debug:
-            print("while")
+        log_code(2, "while")
         condition = self.simplify_condition(command[1])
         if isinstance(condition, bool):
             if condition:
@@ -182,8 +175,7 @@ class CodeGenerator:
             self.replace_line_with("while_end", str(loop_end) + " # while_end", condition_start_local, loop_start)
 
     def command_until(self, command):
-        if debug:
-            print("until")
+        log_code(2, "until")
         loop_start = self.get_current_line()
         self.loop_depth += 1
         self.gen_code_from_commands(command[2])
@@ -196,8 +188,7 @@ class CodeGenerator:
         self.replace_line_with("loop_start", str(loop_start) + " # loop_start", condition_start, condition_end)
 
     def command_proc_call(self, command, address_reg='e'):
-        if debug:
-            print("proc_call")
+        log_code(2, "proc_call")
         proc_call = command[1]
         proc_call_name = proc_call[0]
         proc_call_variables = proc_call[1]
@@ -258,17 +249,19 @@ class CodeGenerator:
         self.code.append(f"JUMP {proc.first_line}")
 
 #endregion
-    
-    def gen_const(self, const, reg='h'):
-        self.code.append(f"RST {reg}")
-        if const > 0:
-            bits = bin(const)[2:]
-            for bit in bits[:-1]:
-                if bit == '1':
-                    self.code.append(f"INC {reg}")
-                self.code.append(f"SHL {reg}")
-            if bits[-1] == '1':
-                self.code.append(f"INC {reg}")
+
+    def gen_const(self, const, reg):
+        self.code.append(f"LOAD 10")
+        if const <= 0:
+            return
+        bits = bin(const)[2:]
+        for i in range(len(bits) + 1):  # Iterate through each bit position (0 to 63)
+            if const & (1 << i):  # Check if the bit at position 'i' is set
+                cell = 10 + i  # Cell index corresponding to 2^i
+                if len(self.code) == 0:  # First bit set
+                    self.code.append(f"LOAD {cell}")
+                else:  # Subsequent bits
+                    self.code.append(f"ADD {cell}")
 
 #region calculate_expression
                 

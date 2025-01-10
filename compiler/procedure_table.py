@@ -24,8 +24,21 @@ class ProcedureTable(dict):
 
     def gen_code(self):
         codeGenerator = CodeGenerator()
+        #TODO update size of const generated
+        self.pre_gen_const(64)
         for name in self:
             self[name].first_line = self.current_line
             codeGenerator.gen_code_from_procedure(name, self)
             self.code.append(codeGenerator.code)
             self.current_line += len(codeGenerator.code)
+
+    def pre_gen_const(self, size):
+        const_code = []
+        const_code.append(f"STORE 10 #Store 0")
+        const_code.append(f"SET 1")
+        self.current_line += 2
+        for cell in range(1, size):
+            const_code.append(f"STORE {cell+10} #Store {2**(cell-1)})")
+            const_code.append(f"ADD {cell+10}")
+            self.current_line += 2
+        self.code.append(const_code)
