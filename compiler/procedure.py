@@ -65,7 +65,8 @@ class Procedure():
         self.symbols.setdefault(name, Variable(self.last_indeks))
         self.last_indeks += 1
 
-    def add_array(self, name, size):
+    def add_array(self, name, left, right):
+        size = right - left + 1
         if name in self.symbols or name in self.links:
             raise Exception(f"Redeclaration of {name}")
         elif size <= 0:

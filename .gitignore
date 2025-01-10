@@ -168,3 +168,5 @@ cython_debug/
 examples/*.mr
 examples2023/*.mr
 /*.txt
+
+myenv/

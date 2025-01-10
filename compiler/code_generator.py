@@ -62,6 +62,8 @@ class CodeGenerator:
                     self.command_while(command)
                 case "until":
                     self.command_until(command)
+                case "for":
+                    print("TODO")
                 case "proc_call":
                     self.command_proc_call(command)
                 case _:

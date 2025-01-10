@@ -6,9 +6,10 @@ from config import debug
 
 
 class ImpLexer(Lexer):
-    tokens = {PROGRAM, PROCEDURE, IS, IN, END, WHILE, DO, ENDWHILE, 
+    tokens = {PROGRAM, PROCEDURE, IS, BEGIN, END, WHILE, DO, ENDWHILE, 
               REPEAT, UNTIL, IF, THEN, ELSE, ENDIF, T, READ, WRITE,
-              GETS, NEQ, GEQ, LEQ, EQ, GT, LT, PID, NUM, GETS}
+              GETS, NEQ, GEQ, LEQ, EQ, GT, LT, PID, NUM, GETS,
+              FOR, FROM, TO, DOWNTO, ENDFOR}
     literals = {'+', '-', '*', '/', '%', ',', ':', ';', '(', ')', '[', ']'}
     ignore = ' \t'
 
@@ -24,6 +25,13 @@ class ImpLexer(Lexer):
 
     ENDWHILE = r"ENDWHILE"
     WHILE = r"WHILE"
+
+    DOWNTO = r"DOWNTO"
+    ENDFOR = r"ENDFOR"
+    FOR = r"FOR"
+    FROM = r"FROM"
+    TO = r"TO"
+
     DO = r"DO"
 
     REPEAT = r"REPEAT"
@@ -36,7 +44,7 @@ class ImpLexer(Lexer):
 
     PROCEDURE = r"PROCEDURE"
     IS = r"IS"
-    IN = r"IN"
+    BEGIN = r"BEGIN"
     END = r"END"
 
     READ = r"READ"
@@ -78,13 +86,13 @@ class ImpParser(Parser):
 
 #region Procedures
     
-    @_('procedures PROCEDURE proc_head IS declarations IN commands END')
+    @_('procedures PROCEDURE proc_head IS declarations BEGIN commands END')
     def procedures(self, p):
         #print(f'procedure {self.currentProcedure.name}')
         self.currentProcedure.set_commands(p.commands)
         self.procedureTable.add_procedure(self.currentProcedure)
 
-    @_('procedures PROCEDURE proc_head IS IN commands END')
+    @_('procedures PROCEDURE proc_head IS BEGIN commands END')
     def procedures(self, p):
         #print(f'procedure {self.currentProcedure.name}')
         self.currentProcedure.set_commands(p.commands)
@@ -99,13 +107,13 @@ class ImpParser(Parser):
  
 #region Main
         
-    @_('program IS declarations IN commands END')
+    @_('program IS declarations BEGIN commands END')
     def main(self, p):
         #print('main')
         self.currentProcedure.set_commands(p.commands)
         self.procedureTable.add_procedure(self.currentProcedure)
     
-    @_('program IS IN commands END')
+    @_('program IS BEGIN commands END')
     def main(self, p):
         #print('main')
         self.currentProcedure.set_commands(p.commands)
@@ -161,6 +169,16 @@ class ImpParser(Parser):
     def command(self, p):
         #print('5')
         return "until", p[3], p[1]
+    
+    @_('FOR PID FROM value DOWNTO value DO commands ENDFOR ";"')
+    def command(self, p):
+        #print('5')
+        return "for", p[7], p[1], p[3], p[5], -1
+    
+    @_('FOR PID FROM value TO value DO commands ENDFOR ";"')
+    def command(self, p):
+        #print('5')
+        return "for", p[7], p[1], p[3], p[5], 1
 
     @_('proc_call ";"')
     def command(self, p):
@@ -208,20 +226,20 @@ class ImpParser(Parser):
         #print('declarations')
         self.currentProcedure.add_variable(p[-1])
 
-    @_('declarations "," PID "[" NUM "]"')
+    @_('declarations "," PID "[" NUM ":" NUM "]"')
     def declarations(self, p):
         #print('declarations_arr')
-        self.currentProcedure.add_array(p[2], p[4])
+        self.currentProcedure.add_array(p[2], p[4], p[6])
 
     @_('PID')
     def declarations(self, p):
         #print('declaration')
         self.currentProcedure.add_variable(p[-1])
 
-    @_('PID "[" NUM "]"')
+    @_('PID "[" NUM ":" NUM "]"')
     def declarations(self, p):
         #print('declaration_arr')
-        self.currentProcedure.add_array(p[0], p[2])
+        self.currentProcedure.add_array(p[0], p[2], p[4])
 
 #endregion
   
