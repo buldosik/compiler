@@ -1,9 +1,9 @@
 from procedure import Array, Link, Link_T, Variable
 from config import isStrict, log_code
 
-address_reg = 'f'
-value_reg = 'g'
-r_a = 'a'
+address_reg = '8'
+value_reg = '7'
+p_0 = '0'
 
 class CodeGenerator:
     def __init__(self):
@@ -39,10 +39,10 @@ class CodeGenerator:
         else:
             self.gen_proc_jump_back(self.procedure.memory_offset)
 
+    ##
     def gen_proc_jump_back(self, memory_offset):
-        self.gen_const(memory_offset, r_a)
-        self.code.append(f"LOAD {r_a}")
-        self.code.append(f"JUMPR {r_a} # BACK")
+        self.gen_const(memory_offset, '0')
+        self.code.append(f"RTRN 0 # BACK")
 
     def gen_code_from_commands(self, commands):
         for command in commands:
@@ -70,27 +70,31 @@ class CodeGenerator:
     
 #region Command
 
+    ##
     def command_write(self, command):
         log_code(2, "Write")
         value = command[1]
 
         if value[0] == "load":
-            self.default_load_var(value[1], out_reg='a')
+            self.default_load_var(value[1], out_reg='0')
 
         elif value[0] == "const":
-            self.gen_const(value[1], reg='a')
+            self.gen_const(value[1], reg='0')
 
-        self.code.append(f"WRITE")
+        self.code.append(f"PUT 0")
 
+    ##
     def command_read(self, command):
         log_code(2, "read")
+        self.code.append(f"# READ")
         target = command[1]
 
-        self.default_load_address(target, isInitialising=True)
+        self.default_load_address(target, '1', isInitialising=True)
 
-        self.code.append(f"READ")
-        self.code.append(f"STORE {address_reg}")
+        self.code.append(f"GET 0")
+        self.code.append(f"STOREI 1")
 
+    ##
     def command_assign(self, command):
         log_code(2, "assign")
         target = command[1]
@@ -100,9 +104,10 @@ class CodeGenerator:
 
         self.default_load_address(target, isInitialising=True)
             
-        self.code.append(f"GET {value_reg}")
-        self.code.append(f"STORE {address_reg}")
+        self.code.append(f"LOAD {value_reg}")
+        self.code.append(f"STOREI {address_reg}")
 
+    ##
     def command_if(self, command):
         log_code(2, "if")
         condition = self.simplify_condition(command[1])
@@ -117,8 +122,9 @@ class CodeGenerator:
             self.gen_code_from_commands(command[2])
             
             command_end = self.get_current_line()
-            self.replace_line_with("if_finish", str(command_end) + " # endif", condition_start, command_start)
+            self.replace_line_with("if_finish", str(command_end - self.get_current_line) + " # endif", condition_start, command_start)
 
+    ##
     def command_ifelse(self, command):
         log_code(2, "ifelse")
         condition = self.simplify_condition(command[1])
@@ -142,13 +148,14 @@ class CodeGenerator:
 
             command_end = self.get_current_line()
 
-            self.replace_line_with("else_start", str(else_start) + " # else_start", condition_start, if_start)
-            self.replace_line_with("endif", str(command_end) + " # endif", else_start_local-1, else_start_local)
+            self.replace_line_with("else_start", str(else_start - self.get_current_line) + " # else_start", condition_start, if_start)
+            self.replace_line_with("endif", str(command_end - self.get_current_line) + " # endif", else_start_local-1, else_start_local)
             #print(self.code[else_start-1])
             #self.code[else_start-1] = self.code[else_start-1].replace('finish',str(command_end))
             #for i in range(condition_start, if_start):
             #    self.code[i] = self.code[i].replace('finish', str(else_start))
 
+    ##
     def command_while(self, command):
         log_code(2, "while")
         condition = self.simplify_condition(command[1])
@@ -157,7 +164,7 @@ class CodeGenerator:
                 #infinity loop
                 loop_start = self.get_current_line()
                 self.gen_code_from_commands(command[2])
-                self.code.append(f"JUMP {loop_start}")
+                self.code.append(f"JUMP {loop_start - self.get_current_line}")
         else:
             condition_start_local = self.get_current_line(withOffset=False)
             condition_start = self.get_current_line()
@@ -168,12 +175,13 @@ class CodeGenerator:
             self.gen_code_from_commands(command[2])
             self.loop_depth -= 1
 
-            self.code.append(f"JUMP {condition_start} # while condition")
+            self.code.append(f"JUMP {condition_start - self.get_current_line} # while condition")
 
             loop_end = self.get_current_line()
 
-            self.replace_line_with("while_end", str(loop_end) + " # while_end", condition_start_local, loop_start)
+            self.replace_line_with("while_end", str(loop_end - self.get_current_line) + " # while_end", condition_start_local, loop_start)
 
+    ##
     def command_until(self, command):
         log_code(2, "until")
         loop_start = self.get_current_line()
@@ -185,7 +193,7 @@ class CodeGenerator:
         self.check_condition(command[1], 'loop_start')
 
         condition_end = self.get_current_line(withOffset=False)
-        self.replace_line_with("loop_start", str(loop_start) + " # loop_start", condition_start, condition_end)
+        self.replace_line_with("loop_start", str(loop_start - self.get_current_line) + " # loop_start", condition_start, condition_end)
 
     def command_proc_call(self, command, address_reg='e'):
         log_code(2, "proc_call")
@@ -200,7 +208,7 @@ class CodeGenerator:
 
         # Load and store addresses
         for variable in proc_call_variables:
-            self.gen_const(current_offset, r_a)
+            self.gen_const(current_offset, p_0)
             self.code.append(f"PUT {address_reg}")
 
             if variable[0] == "load":
@@ -241,7 +249,7 @@ class CodeGenerator:
         self.gen_const(4, reg='b')
         self.gen_const(proc_offset, reg='a')
         self.code.append(f"PUT {address_reg}")
-        self.code.append(f"STRK {r_a}")
+        self.code.append(f"STRK {p_0}")
         self.code.append(f"ADD b")
         self.code.append(f"STORE {address_reg}")
         
@@ -250,22 +258,16 @@ class CodeGenerator:
 
 #endregion
 
-    def gen_const(self, const, reg):
-        self.code.append(f"LOAD 10")
-        if const <= 0:
-            return
-        bits = bin(const)[2:]
-        for i in range(len(bits) + 1):  # Iterate through each bit position (0 to 63)
-            if const & (1 << i):  # Check if the bit at position 'i' is set
-                cell = 10 + i  # Cell index corresponding to 2^i
-                if len(self.code) == 0:  # First bit set
-                    self.code.append(f"LOAD {cell}")
-                else:  # Subsequent bits
-                    self.code.append(f"ADD {cell}")
+    def gen_const(self, const, reg = '9'):
+        self.code.append(f"SET {const}")
+        if reg != '0':
+            self.code.append(f"STORE {reg}")
+            
 
 #region calculate_expression
-                
-    def calculate_expression(self, expression, out_reg='a'):
+
+    ##            
+    def calculate_expression(self, expression, out_reg='1'):
         match expression[0]:
             case "const":
                 self.gen_const(expression[1], out_reg)
@@ -291,54 +293,53 @@ class CodeGenerator:
                 elif expression[0] == "mod":
                     self.calculate_mod(expression[1], expression[2], out_reg)
 
-    def calculate_add(self, expression1, expression2, out_reg='a', second_reg='b'):
+    ##
+    def calculate_add(self, expression1, expression2, out_reg='1', second_reg='2'):
         if expression1[0] == expression2[0] == "const":
             self.gen_const(expression1[1] + expression2[1], out_reg)
 
         elif expression1 == expression2:
-            self.calculate_expression(expression1, out_reg)
-            self.code.append(f"SHL {out_reg}")
-        
-        elif expression2[0] == "const" and expression2[1] < 12:
-            self.calculate_expression(expression1, out_reg)
-            change = f"INC {out_reg}"
-            self.code += expression2[1] * [change]
+            self.calculate_expression(expression1, '0')
+            self.code.append(f"ADD 0")
+            if out_reg != '0':
+                self.code.append(f"STORE {out_reg}")
 
         else:
             self.calculate_expression(expression1, out_reg)
             self.calculate_expression(expression2, second_reg)
-            if out_reg != 'a':
-                self.code.append(f"GET {out_reg}")
+            if out_reg != '0':
+                self.code.append(f"LOAD {out_reg}")
             self.code.append(f"ADD {second_reg}")
-            if out_reg != 'a':
-                self.code.append(f"PUT {out_reg}")
+            if out_reg != '0':
+                self.code.append(f"STORE {out_reg}")
 
-    def calclate_sub(self, expression1, expression2, out_reg='a', second_reg='b'):
+    ##
+    def calclate_sub(self, expression1, expression2, out_reg='1', second_reg='2'):
         if expression1[0] == expression2[0] == "const":
             val = max(0, expression1[1] - expression2[1])
             if val:
                 self.gen_const(val, out_reg)
             else:
-                self.code.append(f"RST {out_reg}")
+                self.code.append(f"LOAD 10")
+                if out_reg != '0':
+                    self.code.append(f"STORE {out_reg}")
 
         elif expression1 == expression2:
-            self.code.append(f"RST {out_reg}")
-
-        elif expression2[0] == "const" and expression2[1] < 12:
-            self.calculate_expression(expression1, out_reg)
-            change = f"DEC {out_reg}"
-            self.code += expression2[1] * [change]
+            self.code.append(f"LOAD 10")
+            if out_reg != '0':
+                self.code.append(f"STORE {out_reg}")
 
         else:
             self.calculate_expression(expression1, out_reg)
             self.calculate_expression(expression2, second_reg)
-            if out_reg != 'a':
-                self.code.append(f"GET {out_reg}")
+            if out_reg != '0':
+                self.code.append(f"LOAD {out_reg}")
             self.code.append(f"SUB {second_reg}")
-            if out_reg != 'a':
-                self.code.append(f"PUT {out_reg}")
+            if out_reg != '0':
+                self.code.append(f"STORE {out_reg}")
 
-    def calculate_mul(self, expression1, expression2, out_reg='a', second_reg='b', third_reg='c', temp_res_reg='d'):
+    ##
+    def calculate_mul(self, expression1, expression2, out_reg='1', second_reg='2', third_reg='3', temp_res_reg='5'):
         if expression1[0] == expression2[0] == "const":
             self.gen_const(expression1[1] * expression2[1], out_reg)
             return
@@ -346,206 +347,213 @@ class CodeGenerator:
         if expression2[0] == "const":
             val = expression2[1]
             if val == 0:
-                self.code.append(f"RST {out_reg}")
+                self.RST(out_reg)
                 return
             elif val == 1:
                 self.calculate_expression(expression1, out_reg)
                 return
             elif val & (val - 1) == 0:
                 self.calculate_expression(expression1, out_reg)
+                self.code.append(f"LOAD {out_reg}")
                 while val > 1:
-                    self.code.append(f"SHL {out_reg}")
+                    self.code.append(f"ADD 0")
                     val /= 2
+                if out_reg != '0':
+                    self.code.append(f"STORE {out_reg}")
                 return
 
         if expression1 == expression2:
             self.calculate_expression(expression1, second_reg)
-            self.code.append(f"RST {r_a}")
-            self.code.append(f"ADD {second_reg}")
-            self.code.append(f"PUT {third_reg}")
+            self.code.append(f"LOAD {second_reg}")
+            self.code.append(f"STORE {third_reg}")
         else:
             self.calculate_expression(expression1, second_reg)
             self.calculate_expression(expression2, third_reg)
 
-        first_line = self.get_current_line() - 1
-
-        self.code.append(f"RST {temp_res_reg}") #1
-        self.code.append(f"GET {third_reg}")
+        self.RST(temp_res_reg) # 1
+        self.code.append(f"LOAD {third_reg}")
         self.code.append(f"SUB {second_reg}")
-        self.code.append(f"JPOS {first_line + 21}")
-        self.code.append(f"JUMP {first_line + 8}")
+        self.code.append(f"JPOS {25}")
+        self.code.append(f"JUMP {7}")
 
         # if second >= third it's better to do $2 * $3
 
-        self.code.append(f"SHL {second_reg}") # 6
-        self.code.append(f"SHR {third_reg}")
+        self.SHL(second_reg) # 7
+        self.SHR(third_reg)
 
-        self.code.append(f"GET {third_reg}") # 8
-        self.code.append(f"JZERO {first_line + 32}")
-        self.code.append(f"SHR {third_reg}")
-        self.code.append(f"SHL {third_reg}")
+        self.code.append(f"LOAD {third_reg}") # 13
+        self.code.append(f"JZERO {27}")
+        self.code.append(f"HALF")
+        self.code.append(f"ADD 0")
         self.code.append(f"SUB {third_reg}")
-        self.code.append(f"JPOS {first_line + 15}")
-        self.code.append(f"JUMP {first_line + 6}")
+        self.code.append(f"JNEG {2}")
+        self.code.append(f"JUMP {-12}")
 
-        self.code.append(f"GET {temp_res_reg}") # 15
+        self.code.append(f"LOAD {temp_res_reg}") # 20
         self.code.append(f"ADD {second_reg}")
-        self.code.append(f"PUT {temp_res_reg}")
-        self.code.append(f"JUMP {first_line + 6}")
+        self.code.append(f"STORE {temp_res_reg}")
+        self.code.append(f"JUMP {-16}")
 
         # if second <= third it's better to do $3 * $2
 
-        self.code.append(f"SHL {third_reg}") # 19
-        self.code.append(f"SHR {second_reg}")
+        self.SHL(second_reg) # 24
+        self.SHR(third_reg)
 
-        self.code.append(f"GET {second_reg}") # 21
-        self.code.append(f"JZERO {first_line + 32}")
-        self.code.append(f"SHR {second_reg}")
-        self.code.append(f"SHL {second_reg}")
+        self.code.append(f"LOAD {second_reg}") # 30
+        self.code.append(f"JZERO {11}")
+        self.code.append(f"HALF")
+        self.code.append(f"ADD 0")
         self.code.append(f"SUB {second_reg}")
-        self.code.append(f"JPOS {first_line + 28}")
-        self.code.append(f"JUMP {first_line + 19}")
+        self.code.append(f"JNEG {2}")
+        self.code.append(f"JUMP {-12}")
 
-        self.code.append(f"GET {temp_res_reg}") # 28
+        self.code.append(f"LOAD {temp_res_reg}") # 37
         self.code.append(f"ADD {third_reg}")
-        self.code.append(f"PUT {temp_res_reg}")
-        self.code.append(f"JUMP {first_line + 19}") # 31
+        self.code.append(f"STORE {temp_res_reg}")
+        self.code.append(f"JUMP {-16}") # 40
 
         if out_reg != temp_res_reg:
-            self.code.append(f"GET {temp_res_reg}")
-            self.code.append(f"PUT {out_reg}")
+            self.code.append(f"LOAD {temp_res_reg}")
+            self.code.append(f"STORE {out_reg}")
 
-    def calculate_div(self, expression1, expression2, out_reg='a', second_reg='b', third_reg='c'):
+    ##
+    def calculate_div(self, expression1, expression2, out_reg='1', second_reg='2', third_reg='3'):
         if expression1[0] == expression2[0] == "const":
             if expression2[1] > 0:
                 self.gen_const(expression1[1] // expression2[1], out_reg)
             else:
-                self.code.append(f"RST {out_reg}")
+                self.RST(out_reg)
             return
 
         elif expression1[0] == "const" and expression1[1] == 0:
-            self.code.append(f"RST {out_reg}")
+            self.RST(out_reg)
             return
         
         elif expression1 == expression2:
             self.calculate_expression(expression1, second_reg)
             first_line = self.get_current_line()
-            self.code.append(f"GET {second_reg}")
-            self.code.append(f"JZERO {first_line + 5}")
-            self.code.append(f"RST {out_reg}")
-            self.code.append(f"INC {out_reg}")
+            self.code.append(f"LOAD {second_reg}")
+            self.code.append(f"JZERO {3}")
+            self.code.append(f"LOAD 11")
+            self.code.append(f"STORE {out_reg}")
             return
 
         elif expression2[0] == "const":
             val = expression2[1]
             if val == 0:
-                self.code.append(f"RST {out_reg}")
+                self.RST(out_reg)
                 return
             elif val == 1:
                 self.calculate_expression(expression1, out_reg)
                 return
             elif val & (val - 1) == 0:
                 self.calculate_expression(expression1, out_reg)
+                self.code.append(f"LOAD {out_reg}")
                 while val > 1:
-                    self.code.append(f"SHR {out_reg}")
+                    self.code.append(f"HALF")
                     val /= 2
+                if out_reg != '0':
+                    self.code.append(f"STORE {out_reg}")
                 return
 
         self.calculate_expression(expression1, second_reg)
         self.calculate_expression(expression2, third_reg)
         self.perform_division(out_reg=out_reg, dividend_reg=second_reg, divisor_reg=third_reg)
 
-    def calculate_mod(self, expression1, expression2, out_reg='a', second_reg='b', third_reg='c'):
+    ##
+    def calculate_mod(self, expression1, expression2, out_reg='1', second_reg='2', third_reg='3'):
         if expression1[0] == expression2[0] == "const":
             if expression2[1] > 0:
                 self.gen_const(expression1[1] % expression2[1], out_reg)
             else:
-                self.code.append(f"RST {out_reg}")
+                self.RST(out_reg)
             return
 
         elif expression1 == expression2:
-            self.code.append(f"RST {out_reg}")
+            self.RST(out_reg)
             return
 
         elif expression1[0] == "const" and expression1[1] == 0:
-            self.code.append(f"RST {out_reg}")
+            self.RST(out_reg)
             return
 
         elif expression2[0] == "const":
             val = expression2[1]
             if val < 2:
-                self.code.append(f"RST {out_reg}")
+                self.RST(out_reg)
                 return
             elif val == 2:
                 self.calculate_expression(expression1, second_reg)
-                self.code.append(f"GET {second_reg}")
-                self.code.append(f"SHR {second_reg}")
-                self.code.append(f"SHL {second_reg}")
-                self.code.append(f"SUB {second_reg}")
-                if out_reg != 'a':
-                    self.code.append(f"PUT {out_reg}")
+                self.code.append(f"LOAD {second_reg}")
+                self.code.append(f"HALF")
+                self.code.append(f"ADD 0")
+                self.code.append(f"STORE {third_reg}")
+                self.code.append(f"LOAD {second_reg}")
+                self.code.append(f"SUB {third_reg}")
+                if out_reg != '0':
+                    self.code.append(f"STORE {out_reg}")
                 return
 
         self.calculate_expression(expression1, second_reg)
         self.calculate_expression(expression2, third_reg)
         self.perform_division(out_mod_reg=out_reg, dividend_reg=second_reg, divisor_reg=third_reg)
 
-    def perform_division(self, out_reg='d', out_mod_reg='e',
-                         dividend_reg='b', divisor_reg='c',
-                         quotient_reg='d', remainder_reg='e'):
+    def perform_division(self, out_reg='3', out_mod_reg='4',
+                         dividend_reg='1', divisor_reg='2',
+                         quotient_reg='3', remainder_reg='4'):
 
-        first_line = self.get_current_line() - 1
-        self.code.append(f"RST {quotient_reg}")          # 1
-        self.code.append(f"RST {remainder_reg}")
-        self.code.append(f"GET {divisor_reg}")
-        self.code.append(f"JZERO {first_line + 37}")     # Exit
-        self.code.append(f"GET {dividend_reg}")          # 5
-        self.code.append(f"PUT {remainder_reg}")
-        self.code.append(f"GET {divisor_reg}")
-        self.code.append(f"PUT {dividend_reg}")
-        self.code.append(f"GET {remainder_reg}")
+        self.RST(quotient_reg)          # 1
+        self.RST(remainder_reg)
+        self.code.append(f"LOAD {divisor_reg}")
+        self.code.append(f"JZERO {43}")     # Exit
+        self.code.append(f"LOAD {dividend_reg}")          # 7
+        self.code.append(f"STORE {remainder_reg}")
+        self.code.append(f"LOAD {divisor_reg}")
+        self.code.append(f"STORE {dividend_reg}")
+        self.code.append(f"LOAD {remainder_reg}")
         self.code.append(f"SUB {dividend_reg}")
-        self.code.append(f"JZERO {first_line + 19}")
-        self.code.append(f"GET {dividend_reg}")          # 12
+        self.code.append(f"JZERO {12}")
+        self.code.append(f"LOAD {dividend_reg}")          # 14
         self.code.append(f"SUB {remainder_reg}")
-        self.code.append(f"JZERO {first_line + 17}")
-        self.code.append(f"SHR {dividend_reg}")
-        self.code.append(f"JUMP {first_line + 19}")
-        self.code.append(f"SHL {dividend_reg}")          # 17
-        self.code.append(f"JUMP {first_line + 12}")
+        self.code.append(f"JZERO {2}")
+        self.SHR(dividend_reg)
+        self.code.append(f"JUMP {5}")
+        self.SHL(dividend_reg)          # 21
+        self.code.append(f"JUMP {-10}")
 
-        self.code.append(f"GET {dividend_reg}")          # 19
+        self.code.append(f"LOAD {dividend_reg}")          # 25
         self.code.append(f"SUB {remainder_reg}")
-        self.code.append(f"JZERO {first_line + 23}")
-        self.code.append(f"JUMP {first_line + 37}")      # Exit
-        self.code.append(f"GET {remainder_reg}")         # 23
+        self.code.append(f"JZERO {2}")
+        self.code.append(f"JUMP {21}")      # Exit
+        self.code.append(f"LOAD {remainder_reg}")         # 29
         self.code.append(f"SUB {dividend_reg}")
-        self.code.append(f"PUT {remainder_reg}")
-        self.code.append(f"INC {quotient_reg}")
+        self.code.append(f"STORE {remainder_reg}")
+        self.INC(quotient_reg)
 
-        self.code.append(f"GET {dividend_reg}")          # 27
+        self.code.append(f"LOAD {dividend_reg}")          # 35
         self.code.append(f"SUB {remainder_reg}")
-        self.code.append(f"JZERO {first_line + 19}")
-        self.code.append(f"SHR {dividend_reg}")
-        self.code.append(f"GET {divisor_reg}")
+        self.code.append(f"JZERO {-12}")
+        self.SHR(dividend_reg)
+        self.code.append(f"LOAD {divisor_reg}")
         self.code.append(f"SUB {dividend_reg}")
-        self.code.append(f"JZERO {first_line + 35}")
-        self.code.append(f"JUMP {first_line + 37}")
-        self.code.append(f"SHL {quotient_reg}")          # 35
-        self.code.append(f"JUMP {first_line + 27}")      # 36
+        self.code.append(f"JZERO {2}")
+        self.code.append(f"JUMP {5}")
+        self.SHL(quotient_reg)          # 45
+        self.code.append(f"JUMP {-13}")      # 48
 
         if out_reg != quotient_reg:
-            self.code.append(f"GET {quotient_reg}")
-            self.code.append(f"PUT {out_reg}")
+            self.code.append(f"LOAD {quotient_reg}")
+            self.code.append(f"STORE {out_reg}")
 
         if out_mod_reg != remainder_reg:
-            self.code.append(f"GET {remainder_reg}")
-            self.code.append(f"PUT {out_mod_reg}")
+            self.code.append(f"LOAD {remainder_reg}")
+            self.code.append(f"STORE {out_mod_reg}")
 
 #endregion
 
 #region condition
 
+    ##
     def simplify_condition(self, condition):
         if condition[1][0] == "const" and condition[2][0] == "const":
             if condition[0] == "le":
@@ -586,27 +594,28 @@ class CodeGenerator:
         else:
             return condition
 
+
     def check_condition(self, condition, exit_line='finish',out_reg='a', second_reg='b', third_reg='c'):
         if condition[1][0] == "const" and condition[1][1] == 0:
             if condition[0] == "ge" or condition[0] == "eq":
-                self.calculate_expression(condition[2], r_a)
+                self.calculate_expression(condition[2], p_0)
                 current_line = self.get_current_line()
                 self.code.append(f"JZERO {current_line + 2}")
                 self.code.append(f"JUMP {exit_line}")
 
             elif condition[0] == "lt" or condition[0] == "ne":
-                self.calculate_expression(condition[2], r_a)
+                self.calculate_expression(condition[2], p_0)
                 self.code.append(f"JZERO {exit_line}")
 
         elif condition[2][0] == "const" and condition[2][1] == 0:
             if condition[0] == "le" or condition[0] == "eq":
-                self.calculate_expression(condition[1], r_a)
+                self.calculate_expression(condition[1], p_0)
                 current_line = self.get_current_line()
                 self.code.append(f"JZERO {current_line + 2}")
                 self.code.append(f"JUMP {exit_line}")
 
             elif condition[0] == "gt" or condition[0] == "ne":
-                self.calculate_expression(condition[1], r_a)
+                self.calculate_expression(condition[1], p_0)
                 self.code.append(f"JZERO {exit_line}")
 
         else:
@@ -670,6 +679,7 @@ class CodeGenerator:
 
 #region Load
 
+    ##
     def default_load_var(self, target, out_reg=value_reg):
         if type(target) == tuple:
             if target[0] == "undeclared":
@@ -684,15 +694,12 @@ class CodeGenerator:
             if target in self.links and type(self.links[target]) == Link:
                 self.load_link_variable(target, out_reg)
                 self.links[target].isUsed = True
-                # if self.links[target].isInitialized:
-                #     self.load_link_variable(target, out_reg)
-                # else:
-                #     raise Exception(f"Variable {target} is not isInitialized")
+
             elif target in self.symbols and type(self.symbols[target]) == Variable:
                 if self.symbols[target].isInitialized:
                     self.load_variable(target, out_reg)
-                else:
 
+                else:
                     if not isStrict and self.loop_depth > 0:
                         self.load_variable(target, out_reg)
                         print(f"Warning: Variable {target} can be uninitialized")
@@ -701,6 +708,7 @@ class CodeGenerator:
             else:
                 raise Exception(f"Assigning to array {target} with no index provided")
 
+    ##
     def default_load_address(self, target, out_reg=address_reg, isInitialising=False):
         if type(target) == tuple:
             if target[0] == "undeclared":
@@ -730,18 +738,19 @@ class CodeGenerator:
             else:
                 raise Exception(f"Assigning to array {target} with no index provided")
 
-    # Put arr_name value into r_x
+    ## Put arr_name value into p_x
     def load_array_at(self, array_name, index, reg=value_reg):
         self.load_array_address_at(array_name, index, reg)
         self.code.append(f"LOAD {reg}")
-        if reg != 'a':
-            self.code.append(f"PUT {reg}")
+        if reg != '0':
+            self.code.append(f"STORE {reg}")
 
-    # Generate in r_x address of arr_name
-    def load_array_address_at(self, array_name, index, reg=address_reg, reg_h='h'):
+    ## Generate in p_x address of arr_name+index
+    def load_array_address_at(self, array_name, index, reg=address_reg):
         if type(index) == int:
             address = self.procedure.get_address((array_name, index))
-            self.gen_const(address, reg)
+            if reg != '0':
+                self.code.append(f"STORE {address}")
             return
         elif type(index) != tuple:
             raise Exception(f"Load_array_address_at_error")
@@ -752,52 +761,52 @@ class CodeGenerator:
                     print(f"Warning: Trying to use {array_name}[{index[1]}] where variable {index[1]} can be uninitialized")
                 else:
                     raise Exception(f"Trying to use {array_name}[{index[1]}] where variable {index[1]} is uninitialized")
-            self.load_variable(index[1], reg_h)
-            var = self.procedure.get_variable(array_name)
-            self.gen_const(var.memory_offset, 'a')
-            self.code.append(f"ADD {reg_h}")
+            self.load_variable(index[1], '9')
 
         elif index[1] in self.links and type(self.links[index[1]]) == Link:
-            self.load_link_variable(index[1], reg_h)
-            var = self.procedure.get_variable(array_name)
-            self.gen_const(var.memory_offset, 'a')
-            self.code.append(f"ADD {reg_h}")
+            self.load_link_variable(index[1], '9')
 
-        if reg != 'a':
-            self.code.append(f"PUT {reg}")
+        var = self.procedure.get_variable(array_name)
+        self.gen_const(var.memory_offset, '0')
+        self.code.append(f"ADD 9")
 
-    # Put var_name value into r_x
+        if reg != '0':
+            self.code.append(f"STORE {reg}")
+
+    ## Put var_name value into p_x
     def load_variable(self, name, reg=value_reg, declared=True):
         if declared:
-            self.load_variable_address(name, reg, declared)
-            self.code.append(f"LOAD {reg}")
-            if reg != 'a':
-                self.code.append(f"PUT {reg}")
+            self.code.append(f"LOAD {self.procedure.get_address(name)}")
+            if reg != '0':
+                self.code.append(f"STORE {reg}")
         else:
             raise Exception(f"Undeclared variable {name}")
 
-    # Generate in r_x address of var_name
+    #? Generate in r_x address of var_name
     def load_variable_address(self, name, reg=address_reg, declared=True):
         if declared:
             address = self.procedure.get_address(name)
             self.gen_const(address, reg)
         else:
             raise Exception(f"Undeclared variable {name}")
-        
+
+    # Load array link    
     def load_link_T_at(self, array_name, index, reg=value_reg):
         self.load_link_T_address_at(array_name, index, reg)
         self.code.append(f"LOAD {reg}")
-        if reg != 'a':
-            self.code.append(f"PUT {reg}")
+        if reg != '0':
+            self.code.append(f"STORE {reg}")
+
+    # Load address
 
     def load_link_T_address_at(self, array_name, index, reg=address_reg, reg_h='h'):
         if type(index) == int:
             address, index = self.procedure.get_address((array_name, index))
-            self.gen_const(address, r_a)
-            self.code.append(f"LOAD {r_a}")
+            self.gen_const(address, p_0)
+            self.code.append(f"LOAD {p_0}")
             self.gen_const(index, reg_h)
             self.code.append(f"ADD {reg_h}")
-            if reg != r_a:
+            if reg != p_0:
                 self.code.append(f"PUT {reg}")
             return
         elif type(index) != tuple:
@@ -812,32 +821,30 @@ class CodeGenerator:
             self.load_variable(index[1], reg_h)
             var = self.procedure.get_variable(array_name)
             self.gen_const(var.memory_offset, 'a')
-            self.code.append(f"LOAD {r_a}")
+            self.code.append(f"LOAD {p_0}")
             self.code.append(f"ADD {reg_h}")
 
         elif index[1] in self.links and type(self.links[index[1]]) == Link:
             self.load_link_variable(index[1], reg_h)
             var = self.procedure.get_variable(array_name)
             self.gen_const(var.memory_offset, 'a')
-            self.code.append(f"LOAD {r_a}")
+            self.code.append(f"LOAD {p_0}")
             self.code.append(f"ADD {reg_h}")
 
         if reg != 'a':
             self.code.append(f"PUT {reg}")
 
-    # Put link_name value into r_x
+    ## Put link_name value into p_x
     def load_link_variable(self, name, reg=value_reg, declared=True):
         if declared:
             address = self.procedure.get_address(name)
-            self.gen_const(address, reg)
-            self.code.append(f"LOAD {reg}")
-            self.code.append(f"LOAD a")
-            if reg != 'a':
-                self.code.append(f"PUT {reg}")
+            self.code.append(f"LOADI {address}")
+            if reg != '0':
+                self.code.append(f"STORE {reg}")
         else:
             raise Exception(f"Undeclared variable {name}")
 
-    # Generate in r_x address of link_name
+    #? Generate in r_x address of link_name
     def load_link_address(self, name, reg=address_reg, declared=True):
         if declared:
             address = self.procedure.get_address(name)
@@ -849,3 +856,22 @@ class CodeGenerator:
             raise Exception(f"Undeclared variable {name}")
         
 #endregion
+
+    def SHR(self, target):
+        self.code.append(f"LOAD {target}")
+        self.code.append(f"ADD {target}")
+        self.code.append(f"STORE {target}") 
+
+    def SHL(self, target):
+        self.code.append(f"LOAD {target}")
+        self.code.append(f"HALF")
+        self.code.append(f"STORE {target}") 
+
+    def RST(self, target):
+        self.code.append(f"LOAD 10")
+        self.code.append(f"STORE {target}") 
+
+    def INC(self, target):
+        self.code.append(f"LOAD {target}")
+        self.code.append(f"ADD 11")
+        self.code.append(f"STORE {target}") 

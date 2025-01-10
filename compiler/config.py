@@ -1,10 +1,10 @@
 debug = False
-debug_compiler_depth = 1
+debug_compiler_depth = 3
 # 0 - nothing
 # 1 - new part
 # 2 - +old part
 # 3 - +all tokenized
-debug_code_depth = 1
+debug_code_depth = 2
 
 isStrict = False
 
