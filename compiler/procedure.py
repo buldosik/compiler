@@ -65,6 +65,12 @@ class Procedure():
         self.symbols.setdefault(name, Variable(self.last_indeks))
         self.last_indeks += 1
 
+    def add_iterator(self, name):
+        if name in self.symbols or name in self.links:
+            return
+        self.symbols.setdefault(name, Variable(self.last_indeks))
+        self.last_indeks += 1
+
     def add_array(self, name, left, right):
         size = right - left + 1
         if name in self.symbols or name in self.links:

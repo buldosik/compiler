@@ -2,7 +2,7 @@ from sly import Lexer, Parser
 from procedure_table import ProcedureTable
 from procedure import Link, Link_T, Procedure, Array, Variable
 import sys
-from config import debug
+from config import log_compiler, debug_compiler_depth
 
 
 class ImpLexer(Lexer):
@@ -79,7 +79,7 @@ class ImpParser(Parser):
 #region Program_all
     @_('procedures main')
     def program_all(self, p):
-        #print('program_all')
+        log_compiler(2, 'program_all')
         return self.procedureTable
 
 #endregion
@@ -88,19 +88,19 @@ class ImpParser(Parser):
     
     @_('procedures PROCEDURE proc_head IS declarations BEGIN commands END')
     def procedures(self, p):
-        #print(f'procedure {self.currentProcedure.name}')
+        log_compiler(2, f'procedure {self.currentProcedure.name}')
         self.currentProcedure.set_commands(p.commands)
         self.procedureTable.add_procedure(self.currentProcedure)
 
     @_('procedures PROCEDURE proc_head IS BEGIN commands END')
     def procedures(self, p):
-        #print(f'procedure {self.currentProcedure.name}')
+        log_compiler(2,f'procedure {self.currentProcedure.name}')
         self.currentProcedure.set_commands(p.commands)
         self.procedureTable.add_procedure(self.currentProcedure)
     
     @_('')
     def procedures(self, p):
-        #print('empty')
+        log_compiler(2, 'empty')
         pass
 
 #endregion
@@ -109,13 +109,13 @@ class ImpParser(Parser):
         
     @_('program IS declarations BEGIN commands END')
     def main(self, p):
-        #print('main')
+        log_compiler(2, 'main')
         self.currentProcedure.set_commands(p.commands)
         self.procedureTable.add_procedure(self.currentProcedure)
     
     @_('program IS BEGIN commands END')
     def main(self, p):
-        #print('main')
+        log_compiler(2, 'main')
         self.currentProcedure.set_commands(p.commands)
         self.procedureTable.add_procedure(self.currentProcedure)
     
@@ -130,12 +130,12 @@ class ImpParser(Parser):
         
     @_('commands command')
     def commands(self, p):
-        #print('command')
+        log_compiler(2, 'command')
         return p[0] + [p[1]]
 
     @_('command')
     def commands(self, p):
-        #print('command')
+        log_compiler(2, 'command')
         return [p[0]]
 
 #endregion
@@ -144,55 +144,55 @@ class ImpParser(Parser):
 
     @_('identifier GETS expression ";"')
     def command(self, p):
-        #print('1')
+        log_compiler(2, '1')
         return "assign", p[0], p[2]
 
     @_('IF condition THEN commands ELSE commands ENDIF')
     def command(self, p):
-        #print('2')
+        log_compiler(2, '2')
         resp = "ifelse", p[1], p[3], p[5]
         return resp
 
     @_('IF condition THEN commands ENDIF')
     def command(self, p):
-        #print('3')
+        log_compiler(2, '3')
         resp = "if", p[1], p[3]
         return resp
 
     @_('WHILE condition DO commands ENDWHILE')
     def command(self, p):
-        #print('4')
+        log_compiler(2, '4')
         resp = "while", p[1], p[3]
         return resp
 
     @_('REPEAT commands UNTIL condition ";"')
     def command(self, p):
-        #print('5')
+        log_compiler(2, '5')
         return "until", p[3], p[1]
     
-    @_('FOR PID FROM value DOWNTO value DO commands ENDFOR ";"')
+    @_('FOR forDeclaration FROM value DOWNTO value DO commands ENDFOR')
     def command(self, p):
-        #print('5')
+        log_compiler(1, '6')
         return "for", p[7], p[1], p[3], p[5], -1
     
-    @_('FOR PID FROM value TO value DO commands ENDFOR ";"')
+    @_('FOR forDeclaration FROM value TO PID DO commands ENDFOR')
     def command(self, p):
-        #print('5')
+        log_compiler(1, '7')
         return "for", p[7], p[1], p[3], p[5], 1
 
     @_('proc_call ";"')
     def command(self, p):
-        #print(f'proc {p[0]}')
+        log_compiler(2, f'proc {p[0]}')
         return 'proc_call', p[0]
 
     @_('READ identifier ";"')
     def command(self, p):
-        #print('6')
+        log_compiler(2, '8')
         return "read", p[1]
 
     @_('WRITE value ";"')
     def command(self, p):
-        #print('7')
+        log_compiler(2, '9')
         return "write", p[1]
 
 #endregion
@@ -223,23 +223,28 @@ class ImpParser(Parser):
 
     @_('declarations "," PID')
     def declarations(self, p):
-        #print('declarations')
+        log_compiler(2, 'declarations')
         self.currentProcedure.add_variable(p[-1])
 
     @_('declarations "," PID "[" NUM ":" NUM "]"')
     def declarations(self, p):
-        #print('declarations_arr')
+        log_compiler(2, 'declarations_arr')
         self.currentProcedure.add_array(p[2], p[4], p[6])
 
     @_('PID')
     def declarations(self, p):
-        #print('declaration')
+        log_compiler(2, 'declaration')
         self.currentProcedure.add_variable(p[-1])
 
     @_('PID "[" NUM ":" NUM "]"')
     def declarations(self, p):
-        #print('declaration_arr')
+        log_compiler(2, 'declaration_arr')
         self.currentProcedure.add_array(p[0], p[2], p[4])
+
+    @_('PID')
+    def forDeclaration(self, p):
+        log_compiler(1, 'declaration_iterator')
+        self.currentProcedure.add_iterator(p[-1])
 
 #endregion
   
@@ -247,23 +252,23 @@ class ImpParser(Parser):
         
     @_('args_decl "," PID')
     def args_decl(self, p):
-        #print('add_link')
+        log_compiler(2, 'add_link')
         self.currentProcedure.add_link(p[2])
 
     @_('args_decl "," T PID ')
     def args_decl(self, p):
-        #print('add_link_T')
+        log_compiler(2, 'add_link_T')
         self.currentProcedure.add_link_T(p[3])
 
     @_('PID')
     def args_decl(self, p):
-        #print('init Proc')
+        log_compiler(2, 'init Proc')
         self.currentProcedure = Procedure(self.procedureTable.memory_offset)
         self.currentProcedure.add_link(p[0])
 
     @_('T PID')
     def args_decl(self, p):
-        #print('init Proc')
+        log_compiler(2, 'init Proc')
         self.currentProcedure = Procedure(self.procedureTable.memory_offset)
         self.currentProcedure.add_link_T(p[1])
 
@@ -424,7 +429,7 @@ tokenized = lex.tokenize(text)
 pars.parse(tokenized)
 procedureTable = pars.procedureTable
 
-if debug:
+if debug_compiler_depth >= 3:
     for i in procedureTable:
         proc = procedureTable[i]
         print(proc.name, proc.commands)
