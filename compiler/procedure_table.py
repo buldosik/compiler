@@ -1,9 +1,9 @@
 from code_generator import CodeGenerator
 
 class ProcedureTable(dict):
-    def __init__(self):
+    def __init__(self, memory_offset):
         super().__init__()
-        self.memory_offset = 0
+        self.memory_offset = memory_offset
         self.current_line = 0
         self.first_line = ''
         self.code = []
@@ -20,7 +20,7 @@ class ProcedureTable(dict):
 
     def update_first_jump(self):
         first_line = self["PROGRAM"].first_line
-        self.first_line = self.first_line.replace('start_program', str(first_line))
+        self.first_line = self.first_line.replace('start_program', str(first_line-3))
 
     def gen_code(self):
         codeGenerator = CodeGenerator()

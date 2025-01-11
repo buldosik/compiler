@@ -1,5 +1,5 @@
-PROCEDURE gcd(a,b,c) IS
-  x,y
+PROCEDURE gcd(a,b,c) IS #101,102,103
+  x,y #104,105
 BEGIN
   x:=a;
   y:=b;
@@ -13,17 +13,18 @@ BEGIN
     ENDIF
   ENDWHILE
   c:=x;
+  WRITE c;
 END
 
 PROGRAM IS
   a,b,c,d,x,y,z
 BEGIN
-  READ a;
-  READ b;
-  READ c;
-  READ d;
-  gcd(a,b,x);
-  gcd(c,d,y);
-  gcd(x,y,z);
+  READ a; #107
+  READ b; #108
+  READ c; #109
+  READ d; #110
+  gcd(a,b,x); #107->101, 108->102, 111->103
+  gcd(c,d,y); #109->101, 110->102, 112->103
+  gcd(x,y,z); #111->101, 112->102, 113->103
   WRITE z;
 END

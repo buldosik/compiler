@@ -72,9 +72,9 @@ class ImpLexer(Lexer):
 
 class ImpParser(Parser):
     tokens = ImpLexer.tokens
-    currentProcedure = Procedure(100)
+    currentProcedure = Procedure(memory_offset=100)
     code = None
-    procedureTable = ProcedureTable()
+    procedureTable = ProcedureTable(memory_offset=100)
 
 #region Program_all
     @_('procedures main')

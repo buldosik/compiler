@@ -1,5 +1,5 @@
 debug = False
-debug_compiler_depth = 3
+debug_compiler_depth = 0
 # 0 - nothing
 # 1 - new part
 # 2 - +old part
