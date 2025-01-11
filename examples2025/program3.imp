@@ -4,32 +4,19 @@ PROCEDURE check(n,d,p) IS
 BEGIN
     p:=0;
     r:=n%d;
-    WRITE 333333333;
-    WRITE n;
-    WRITE d;
-    WRITE r;
-    WHILE p<10 DO
-        WRITE 444444444;
-        WRITE n;
+    WHILE r=0 DO
         n:=n/d;
-        WRITE n;
         p:=p+1;
-        WRITE p;
         r:=n%d;
-        WRITE r;
     ENDWHILE
-    WRITE p;
 END
 
 PROGRAM IS
   n,m,potega,dzielnik
 BEGIN
   READ n;
-  WRITE n;
   dzielnik:=2;
   m:=dzielnik*dzielnik;
-  WRITE m;
-  WRITE 1111111111;
   WHILE n>=m DO
     check(n,dzielnik,potega);
     IF potega>0 THEN # jest podzielna przez dzielnik

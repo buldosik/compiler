@@ -436,11 +436,13 @@ if debug_compiler_depth >= 3:
 
     print("GEN_CODE")
 
+procedureTable.pre_gen_const()
 procedureTable.gen_first_jump()
 procedureTable.gen_code()
 procedureTable.update_first_jump()
 with open(sys.argv[2], 'w') as out_f:
-    print(procedureTable.first_line, file=out_f)
+    for line in procedureTable.first_line:
+        print(line, file=out_f)
     for procedureCode in procedureTable.code:
         for line in procedureCode:
             print(line, file=out_f)

@@ -13,7 +13,6 @@ BEGIN
     ENDIF
   ENDWHILE
   c:=x;
-  WRITE c;
 END
 
 PROGRAM IS

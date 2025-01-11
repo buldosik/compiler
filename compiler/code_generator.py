@@ -241,7 +241,7 @@ class CodeGenerator:
         # Store return line
         self.gen_const(proc_offset, reg='0')
         self.code.append(f"STORE {return_reg}")
-        self.code.append(f"SET {self.get_current_line()}")
+        self.code.append(f"SET {self.get_current_line()+3}")
         self.code.append(f"STOREI {return_reg} # Store BACK")
         
         # Jump
@@ -493,12 +493,13 @@ class CodeGenerator:
                          dividend_reg='21', divisor_reg='22',
                          quotient_reg='23', remainder_reg='24'):
 
-        
+        zero_line = self.get_current_line(withOffset=False)
         self.RST(quotient_reg)                            # 1
         self.RST(remainder_reg)
+
         # Step 1: Handle division by zero
         self.code.append(f"LOAD {divisor_reg}")
-        self.code.append(f"JZERO {43} # Exit  6->49")     # 6->49 Exit
+        self.code.append(f"JZERO #exit")     # 6->50 Exit
 
         # Step 2: Initialize registers
         self.code.append(f"LOAD {dividend_reg}")          # 7
@@ -507,45 +508,53 @@ class CodeGenerator:
         self.code.append(f"STORE {dividend_reg}")
 
         # Step 3: Division loop
-        self.code.append(f"LOAD {remainder_reg}")
+        self.code.append(f"LOAD {remainder_reg}")         # 11
         self.code.append(f"SUB {dividend_reg}")
-        self.code.append(f"JZERO {12} # 13->25")          # 13->25
-        self.code.append(f"LOAD {dividend_reg}")          # 14
+        self.code.append(f"JPOS #continue")            # 13->15
+        self.code.append(f"JUMP #step4")           # 14->27
+        step3mid = self.get_current_line(withOffset=False)
+        self.code.append(f"LOAD {dividend_reg}")          # 15
         self.code.append(f"SUB {remainder_reg}")
-        self.code.append(f"JZERO {5} # 16->21")           # 16->21
+        self.code.append(f"JPOS #continue")            # 17->19
+        self.code.append(f"JUMP #step3shl")            # 18->23
         self.SHR(dividend_reg)
-        self.code.append(f"JUMP {5} # 20->25")            # 20->25
-        self.SHL(dividend_reg)                            # 21
-        self.code.append(f"JUMP {-10} # 24->14")          # 24->14
+        self.code.append(f"JUMP #step4")            # 22->27
+        step3shl = self.get_current_line(withOffset=False)
+        self.SHL(dividend_reg)                            # 23
+        self.code.append(f"JUMP #step3mid")          # 26->15
 
         # Step 4: Check remainder and update quotient
-        self.code.append(f"LOAD {dividend_reg}")          # 25
+        step4 = self.get_current_line(withOffset=False)
+        self.code.append(f"LOAD {dividend_reg}")          # 27
         self.code.append(f"SUB {remainder_reg}")
-        self.code.append(f"JZERO {2} # 27->29")           # 27->29
-        self.code.append(f"JUMP {21} # Exit 28->49")      # 28->49 Exit
-        self.code.append(f"LOAD {remainder_reg}")         # 29
+        self.code.append(f"JPOS #exit")      # 29->50 Exit
+        self.code.append(f"LOAD {remainder_reg}")         # 30
         self.code.append(f"SUB {dividend_reg}")
         self.code.append(f"STORE {remainder_reg}")
         self.INC(quotient_reg)
 
         # Step 5: Adjust registers and continue
-        self.code.append(f"LOAD {dividend_reg}")          # 35
+        step5 = self.get_current_line(withOffset=False)
+        self.code.append(f"LOAD {dividend_reg}")          # 36
         self.code.append(f"SUB {remainder_reg}")
-        self.code.append(f"JZERO {-12} # 37->25")         # 37->25        
+        self.code.append(f"JPOS #continue")            # 38->40
+        self.code.append(f"JUMP #step4")          # 39->27        
         self.SHR(dividend_reg)
 
         # Step 6: Check if shifting needed
-        self.code.append(f"LOAD {divisor_reg}")
+        self.code.append(f"LOAD {divisor_reg}")           # 43
         self.code.append(f"SUB {dividend_reg}")
-        self.code.append(f"JZERO {2} # 43->45")           # 43->45
-        self.code.append(f"JUMP {5 }# Exit 44->49")       # 44->49 Exit
-        self.SHL(quotient_reg)                            # 45
-        self.code.append(f"JUMP {-13} # 48->35")          # 48->35
+        self.code.append(f"JPOS #exit")        # 45->50 Exit
+        self.SHL(quotient_reg)                            # 46
+        self.code.append(f"JUMP #step5")          # 49->36
+        exit_line = self.get_current_line(withOffset=False)
 
-        self.code.append(f"PUT {dividend_reg}")
-        self.code.append(f"PUT {divisor_reg}")
-        self.code.append(f"PUT {quotient_reg}")
-        self.code.append(f"PUT {remainder_reg}")
+        self.replace_line_with("#continue", "2 # continue", zero_line, exit_line)
+        self.replace_line_with_new_position("#step3shl", step3shl, " # step3shl", zero_line, exit_line)
+        self.replace_line_with_new_position("#step3mid", step3mid, " # step3mid", zero_line, exit_line)
+        self.replace_line_with_new_position("#step4", step4, " # step4", zero_line, exit_line)
+        self.replace_line_with_new_position("#step5", step5, " # step5", zero_line, exit_line)
+        self.replace_line_with_new_position("#exit", exit_line, " # exit", zero_line, exit_line)
 
 
         if out_reg != quotient_reg:
@@ -872,12 +881,12 @@ class CodeGenerator:
 
     def SHR(self, target):
         self.code.append(f"LOAD {target}")
-        self.code.append(f"ADD {target}")
+        self.code.append(f"HALF")
         self.code.append(f"STORE {target}") 
 
     def SHL(self, target):
         self.code.append(f"LOAD {target}")
-        self.code.append(f"HALF")
+        self.code.append(f"ADD {target}")
         self.code.append(f"STORE {target}") 
 
     def RST(self, target):
