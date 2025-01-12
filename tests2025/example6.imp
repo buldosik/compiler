@@ -18,7 +18,7 @@ BEGIN
         l := k - 1;
 	i[j] := i[k] + 1;
 	f[j] := f[k] + f[l];
-        s[j] := s[k] * i[j];
+        #s[j] := s[k] * i[j];
     ENDFOR
     WRITE s[n];
     WRITE f[n];

@@ -45,12 +45,11 @@ class CodeGenerator:
 
     ##
     def gen_proc_jump_back(self, memory_offset):
-        #self.gen_const(memory_offset, '0')
-        #self.code.append(f"LOAD 0")
         self.code.append(f"RTRN {memory_offset} # BACK")
 
     def gen_code_from_commands(self, commands):
         for command in commands:
+            log_code(1, command)
             match command[0]:
                 case "write":
                     self.command_write(command)
@@ -67,7 +66,7 @@ class CodeGenerator:
                 case "until":
                     self.command_until(command)
                 case "for":
-                    print("TODO")
+                    self.command_for(command)
                 case "proc_call":
                     self.command_proc_call(command)
                 case _:
@@ -104,6 +103,7 @@ class CodeGenerator:
         target = command[1]
 
         expression = command[2]
+        log_code(2, expression)
         self.calculate_expression(expression, value_reg)
 
         self.default_load_address(target, isInitialising=True)
@@ -176,7 +176,7 @@ class CodeGenerator:
             self.code.append(f"JUMP {condition_start - self.get_current_line(withOffset=False)} # while condition")
 
             loop_end = self.get_current_line(withOffset=False)
-            print(loop_end, "---")
+            #print(loop_end, "---")
             self.replace_line_with_new_position("while_end", loop_end, " # while_end", condition_start, loop_start)
 
     ##
@@ -193,6 +193,52 @@ class CodeGenerator:
         condition_end = self.get_current_line(withOffset=False)
         self.replace_line_with("loop_start", str(loop_start - self.get_current_line() + 1) + " # loop_start", condition_start, condition_end)
 
+    def command_for(self, command):
+        log_code(2, f"for + {self.get_current_line()}")
+        iterator_address = self.procedure.get_address(command[2])
+        for_type = command[5]
+
+        if type(command[3]) != tuple:
+            command = command[:3] + (('load', command[3]),) + command[3:]
+        if type(command[4]) != tuple:
+            command = command[:4] + (('load', command[4]),) + command[5:]
+
+        self.calculate_expression(command[3], str(iterator_address))
+        self.calculate_expression(command[4], str(iterator_address+1))
+
+        condition_start = self.get_current_line(withOffset=False)
+
+        # Checking condition
+        if for_type == -1:
+            self.code.append(f'LOAD {iterator_address}')
+            self.code.append(f'SUB {iterator_address+1}')
+        else:
+            self.code.append(f'LOAD {iterator_address+1}')
+            self.code.append(f'SUB {iterator_address}')
+        self.code.append(f'JPOS 2')
+        self.code.append(f'JUMP for_end')
+
+        # Inner part of for
+        for_start = self.get_current_line(withOffset=False)
+        self.loop_depth += 1
+        self.gen_code_from_commands(command[1])
+        self.loop_depth -= 1
+
+        # In/Decresing iterator
+        self.code.append(f'LOAD {iterator_address}')
+        if for_type == -1:
+            self.code.append(f'SUB {11}')
+        else:
+            self.code.append(f'ADD {11}')
+        self.code.append(f'STORE {iterator_address}')
+        
+        # Jump to start of loop
+        self.code.append(f"JUMP {condition_start - self.get_current_line(withOffset=False)} # for condition")
+
+        for_end = self.get_current_line(withOffset=False)
+        self.replace_line_with_new_position("for_end", for_end, " # jump -> for_end", condition_start, for_start)
+
+    ##
     def command_proc_call(self, command, return_reg='7'):
         log_code(2, f"proc_call + {self.get_current_line()}")
         proc_call = command[1]
@@ -693,7 +739,7 @@ class CodeGenerator:
                 self.code.append(f"JZERO {2}")
                 self.code.append(f"JUMP {4}")
 
-                self.code.append(f"GET {third_reg}")
+                self.code.append(f"LOAD {third_reg}")
                 self.code.append(f"SUB {second_reg}")
                 self.code.append(f"JZERO {exit_line}")
 
@@ -763,7 +809,7 @@ class CodeGenerator:
     ## Put arr_name value into p_x
     def load_array_at(self, array_name, index, reg=value_reg):
         self.load_array_address_at(array_name, index, reg)
-        self.code.append(f"LOAD {reg}")
+        self.code.append(f"LOADI {reg}")
         if reg != '0':
             self.code.append(f"STORE {reg}")
 
@@ -771,8 +817,9 @@ class CodeGenerator:
     def load_array_address_at(self, array_name, index, reg=address_reg):
         if type(index) == int:
             address = self.procedure.get_address((array_name, index))
+            self.code.append(f"SET {address}")
             if reg != '0':
-                self.code.append(f"STORE {address}")
+                self.code.append(f"STORE {reg}")
             return
         elif type(index) != tuple:
             raise Exception(f"Load_array_address_at_error")
@@ -804,7 +851,7 @@ class CodeGenerator:
         else:
             raise Exception(f"Undeclared variable {name}")
 
-    #? Generate in r_x address of var_name
+    ## Generate in r_x address of var_name
     def load_variable_address(self, name, reg=address_reg, declared=True):
         if declared:
             address = self.procedure.get_address(name)
@@ -812,22 +859,20 @@ class CodeGenerator:
         else:
             raise Exception(f"Undeclared variable {name}")
 
-    #? Load array link    
+    ## Load array link    
     def load_link_T_at(self, array_name, index, reg=value_reg):
         self.load_link_T_address_at(array_name, index, reg)
-        self.code.append(f"LOAD {reg}")
+        self.code.append(f"LOADI {reg}")
         if reg != '0':
             self.code.append(f"STORE {reg}")
 
-    # Load address
-
-    #?
-    def load_link_T_address_at(self, array_name, index, reg=address_reg, reg_h='8'):
+    ## Load address
+    def load_link_T_address_at(self, array_name, index, reg=address_reg, reg_h='9'):
         if type(index) == int:
             address, index = self.procedure.get_address((array_name, index))
-            self.gen_const(address, p_0)
-            self.code.append(f"LOAD {p_0}")
-            self.gen_const(index, reg_h)
+            self.gen_const(address, reg_h)
+            self.code.append(f"STORE {reg_h}")
+            self.gen_const(index, p_0)
             self.code.append(f"ADD {reg_h}")
             if reg != p_0:
                 self.code.append(f"STORE {reg}")
@@ -836,6 +881,7 @@ class CodeGenerator:
             raise Exception(f"Load_array_address_at_error")
         
         if index[1] in self.symbols and type(self.symbols[index[1]]) == Variable:
+            print(index[1])
             if not self.symbols[index[1]].isInitialized:
                 if not isStrict and self.loop_depth > 0:
                     print(f"Warning: Trying to use {array_name}[{index[1]}] where variable {index[1]} can be uninitialized")
@@ -843,8 +889,7 @@ class CodeGenerator:
                     raise Exception(f"Trying to use {array_name}[{index[1]}] where variable {index[1]} is uninitialized")
             self.load_variable(index[1], reg_h)
             var = self.procedure.get_variable(array_name)
-            self.gen_const(var.memory_offset, '0')
-            self.code.append(f"LOAD {p_0}")
+            self.code.append(f"LOAD {var.memory_offset}")
             self.code.append(f"ADD {reg_h}")
 
         elif index[1] in self.links and type(self.links[index[1]]) == Link:
@@ -854,10 +899,10 @@ class CodeGenerator:
             self.code.append(f"LOAD {p_0}")
             self.code.append(f"ADD {reg_h}")
 
-        if reg != 'a':
-            self.code.append(f"PUT {reg}")
+        if reg != '0':
+            self.code.append(f"STORE {reg}")
 
-    #? Put link_name value into p_x
+    ## Put link_name value into p_x
     def load_link_variable(self, name, reg=value_reg, declared=True):
         if declared:
             address = self.procedure.get_address(name)
@@ -867,7 +912,7 @@ class CodeGenerator:
         else:
             raise Exception(f"Undeclared variable {name}")
 
-    #? Generate in r_x address of link_name
+    ## Generate in r_x address of link_name
     def load_link_address(self, name, reg=address_reg, declared=True):
         if declared:
             address = self.procedure.get_address(name)

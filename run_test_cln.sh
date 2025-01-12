@@ -14,7 +14,7 @@ python3 compiler/compiler.py "$infile" "$outfile"
 # Check if the compilation was successful
 if [ $? -eq 0 ]; then
     # Run the virtual machine with the output file
-    ./virtual_machine/maszyna-wirtualna-cln "$outfile"
+    ./virtual_machine2025/maszyna-wirtualna-cln "$outfile"
 else
     echo ""
     echo "Compilation failed. Exiting."

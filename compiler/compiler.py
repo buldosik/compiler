@@ -244,7 +244,8 @@ class ImpParser(Parser):
     @_('PID')
     def forDeclaration(self, p):
         log_compiler(1, 'declaration_iterator')
-        self.currentProcedure.add_iterator(p[-1])
+        self.currentProcedure.add_iterator(p[0])
+        return p[0]
 
 #endregion
   
