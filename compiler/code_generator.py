@@ -407,47 +407,64 @@ class CodeGenerator:
             self.calculate_expression(expression1, second_reg)
             self.calculate_expression(expression2, third_reg)
 
+        first_line = self.get_current_line(withOffset=False)
         self.RST(temp_res_reg) # 1
         self.code.append(f"LOAD {third_reg}")
         self.code.append(f"SUB {second_reg}")
-        self.code.append(f"JPOS {25}")
-        self.code.append(f"JUMP {7}")
+        self.code.append(f"JPOS #check_last_bit2")
+        self.code.append(f"JUMP #check_last_bit1")
 
         # if second >= third it's better to do $2 * $3
 
+        next_iteration1 = self.get_current_line(withOffset=False)
         self.SHL(second_reg) # 7
         self.SHR(third_reg)
 
+        check_last_bit1 = self.get_current_line(withOffset=False)
         self.code.append(f"LOAD {third_reg}") # 13
-        self.code.append(f"JZERO {27}")
+        self.code.append(f"JZERO #exit_mul")
         self.code.append(f"HALF")
         self.code.append(f"ADD 0")
         self.code.append(f"SUB {third_reg}")
         self.code.append(f"JNEG {2}")
-        self.code.append(f"JUMP {-12}")
+        self.code.append(f"JUMP #next_iteration1")
 
+        increasing_out1 = self.get_current_line(withOffset=False)
         self.code.append(f"LOAD {temp_res_reg}") # 20
         self.code.append(f"ADD {second_reg}")
         self.code.append(f"STORE {temp_res_reg}")
-        self.code.append(f"JUMP {-16}")
+        self.code.append(f"JUMP #next_iteration1")
 
         # if second <= third it's better to do $3 * $2
 
-        self.SHL(second_reg) # 24
-        self.SHR(third_reg)
+        next_iteration2 = self.get_current_line(withOffset=False)
+        self.SHR(second_reg) # 24
+        self.SHL(third_reg)
 
+        check_last_bit2 = self.get_current_line(withOffset=False)
         self.code.append(f"LOAD {second_reg}") # 30
-        self.code.append(f"JZERO {11}")
+        self.code.append(f"JZERO #exit_mul")
         self.code.append(f"HALF")
         self.code.append(f"ADD 0")
         self.code.append(f"SUB {second_reg}")
         self.code.append(f"JNEG {2}")
-        self.code.append(f"JUMP {-12}")
+        self.code.append(f"JUMP #next_iteration2")
 
+        increasing_out2 = self.get_current_line(withOffset=False)
         self.code.append(f"LOAD {temp_res_reg}") # 37
         self.code.append(f"ADD {third_reg}")
         self.code.append(f"STORE {temp_res_reg}")
-        self.code.append(f"JUMP {-16}") # 40
+        self.code.append(f"JUMP #next_iteration2") # 40
+        exit_mul = self.get_current_line(withOffset=False)
+
+        
+        self.replace_line_with_new_position("#increasing_out1", increasing_out1, " # increasing_out1", first_line, exit_mul)
+        self.replace_line_with_new_position("#check_last_bit1", check_last_bit1, " # check_last_bit1", first_line, exit_mul)
+        self.replace_line_with_new_position("#next_iteration1", next_iteration1, " # next_iteration1", first_line, exit_mul)
+        self.replace_line_with_new_position("#increasing_out2", increasing_out2, " # increasing_out2", first_line, exit_mul)
+        self.replace_line_with_new_position("#check_last_bit2", check_last_bit2, " # check_last_bit2", first_line, exit_mul)
+        self.replace_line_with_new_position("#next_iteration2", next_iteration2, " # next_iteration2", first_line, exit_mul)
+        self.replace_line_with_new_position("#exit_mul", exit_mul, " # exit_mul", first_line, exit_mul)
 
         if out_reg != temp_res_reg:
             self.code.append(f"LOAD {temp_res_reg}")
@@ -615,7 +632,7 @@ class CodeGenerator:
 
 #region condition
 
-    #??
+    ##
     def simplify_condition(self, condition):
         if condition[1][0] == "const" and condition[2][0] == "const":
             if condition[0] == "le":
@@ -630,22 +647,6 @@ class CodeGenerator:
                 return condition[1][1] == condition[2][1]
             elif condition[0] == "ne":
                 return condition[1][1] != condition[2][1]
-
-        elif condition[1][0] == "const" and condition[1][1] == 0:
-            if condition[0] == "le":
-                return True
-            elif condition[0] == "gt":
-                return False
-            else:
-                return condition
-
-        elif condition[2][0] == "const" and condition[2][1] == 0:
-            if condition[0] == "ge":
-                return True
-            elif condition[0] == "lt":
-                return False
-            else:
-                return condition
 
         elif condition[1] == condition[2]:
             if condition[0] in ["ge", "le", "eq"]:
