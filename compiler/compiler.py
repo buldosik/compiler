@@ -223,7 +223,7 @@ class ImpParser(Parser):
 
     @_('declarations "," PID')
     def declarations(self, p):
-        log_compiler(2, 'declarations')
+        log_compiler(1, 'declarations')
         self.currentProcedure.add_variable(p[-1])
 
     @_('declarations "," PID "[" NUM ":" NUM "]"')
@@ -234,7 +234,7 @@ class ImpParser(Parser):
     @_('PID')
     def declarations(self, p):
         log_compiler(2, 'declaration')
-        self.currentProcedure.add_variable(p[-1])
+        self.currentProcedure.add_variable(p[0])
 
     @_('PID "[" NUM ":" NUM "]"')
     def declarations(self, p):
@@ -243,7 +243,7 @@ class ImpParser(Parser):
 
     @_('PID')
     def forDeclaration(self, p):
-        log_compiler(1, 'declaration_iterator')
+        log_compiler(1, f'declaration_iterator {p[0]}')
         self.currentProcedure.add_iterator(p[0])
         return p[0]
 

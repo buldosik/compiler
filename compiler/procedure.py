@@ -1,8 +1,9 @@
 class Array:
-    def __init__(self, name, memory_offset, size):
+    def __init__(self, name, memory_offset, size, shift):
         self.name = name
         self.memory_offset = memory_offset
         self.size = size
+        self.shift = shift
 
     def __repr__(self):
         return f"[{self.memory_offset}, {self.size}]"
@@ -63,7 +64,7 @@ class Procedure():
         if name in self.symbols or name in self.links:
             raise Exception(f"Redeclaration of {name}")
         self.symbols.setdefault(name, Variable(self.last_indeks))
-        self.last_indeks += 1
+        self.last_indeks += 2
 
     def add_iterator(self, name):
         if name in self.symbols or name in self.links:
@@ -77,7 +78,7 @@ class Procedure():
             raise Exception(f"Redeclaration of {name}")
         elif size <= 0:
             raise Exception(f"Wrong range in declaration of {name}")
-        self.symbols.setdefault(name, Array(name, self.last_indeks, size))
+        self.symbols.setdefault(name, Array(name, self.last_indeks, size, left))
         self.last_indeks += size
 
     def add_link(self, name):

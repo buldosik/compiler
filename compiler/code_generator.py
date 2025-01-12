@@ -193,8 +193,9 @@ class CodeGenerator:
         condition_end = self.get_current_line(withOffset=False)
         self.replace_line_with("loop_start", str(loop_start - self.get_current_line() + 1) + " # loop_start", condition_start, condition_end)
 
+    ##
     def command_for(self, command):
-        log_code(2, f"for + {self.get_current_line()}")
+        log_code(1, f"for + {self.get_current_line()}")
         iterator_address = self.procedure.get_address(command[2])
         for_type = command[5]
 
@@ -206,17 +207,15 @@ class CodeGenerator:
         self.calculate_expression(command[3], str(iterator_address))
         self.calculate_expression(command[4], str(iterator_address+1))
 
-        condition_start = self.get_current_line(withOffset=False)
-
         # Checking condition
+        condition_start = self.get_current_line(withOffset=False)
         if for_type == -1:
             self.code.append(f'LOAD {iterator_address}')
             self.code.append(f'SUB {iterator_address+1}')
         else:
             self.code.append(f'LOAD {iterator_address+1}')
             self.code.append(f'SUB {iterator_address}')
-        self.code.append(f'JPOS 2')
-        self.code.append(f'JUMP for_end')
+        self.code.append(f'JNEG for_end')
 
         # Inner part of for
         for_start = self.get_current_line(withOffset=False)
