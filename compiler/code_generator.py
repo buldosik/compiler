@@ -101,13 +101,22 @@ class CodeGenerator:
     def command_assign(self, command):
         log_code(2, f"assign + {self.get_current_line()}")
         target = command[1]
+        print(target)
 
         expression = command[2]
         log_code(2, expression)
         self.calculate_expression(expression, value_reg)
 
         self.default_load_address(target, isInitialising=True)
-            
+
+        flag = False
+        try:
+            if type(target) == str and self.symbols[target].isIterator:
+                flag = True
+        except:
+            print('something')
+        if flag:
+            raise Exception(f"Impossible to change value of iterator '{target}'")
         self.code.append(f"LOAD {value_reg}")
         self.code.append(f"STOREI {address_reg} # ASSIGN")
 
@@ -809,7 +818,7 @@ class CodeGenerator:
     ## Put arr_name value into p_x
     def load_array_at(self, array_name, index, reg=value_reg):
         self.load_array_address_at(array_name, index, reg)
-        self.code.append(f"LOADI {reg}")
+        self.code.append(f"LOADI {reg} # load_array_at")
         if reg != '0':
             self.code.append(f"STORE {reg}")
 
@@ -817,7 +826,7 @@ class CodeGenerator:
     def load_array_address_at(self, array_name, index, reg=address_reg):
         if type(index) == int:
             address = self.procedure.get_address((array_name, index))
-            self.code.append(f"SET {address}")
+            self.code.append(f"SET {address} # load_array_address_at int")
             if reg != '0':
                 self.code.append(f"STORE {reg}")
             return
@@ -837,7 +846,7 @@ class CodeGenerator:
 
         var = self.procedure.get_variable(array_name)
         self.gen_const(var.memory_offset, '0')
-        self.code.append(f"ADD 9")
+        self.code.append(f"ADD 9 # load_array_address_at index X")
 
         if reg != '0':
             self.code.append(f"STORE {reg}")
@@ -845,8 +854,8 @@ class CodeGenerator:
     ## Put var_name value into p_x
     def load_variable(self, name, reg=value_reg, declared=True):
         if declared:
-            self.code.append(f"LOAD {self.procedure.get_address(name)}")
-            if reg != '0':
+            self.code.append(f"LOAD {self.procedure.get_address(name)} # load_variable")
+            if reg != p_0:
                 self.code.append(f"STORE {reg}")
         else:
             raise Exception(f"Undeclared variable {name}")
@@ -855,14 +864,16 @@ class CodeGenerator:
     def load_variable_address(self, name, reg=address_reg, declared=True):
         if declared:
             address = self.procedure.get_address(name)
-            self.gen_const(address, reg)
+            self.code.append(f"SET {address} # load_variable_address")
+            if reg != '0':
+                self.code.append(f"STORE {reg}")
         else:
             raise Exception(f"Undeclared variable {name}")
 
     ## Load array link    
     def load_link_T_at(self, array_name, index, reg=value_reg):
         self.load_link_T_address_at(array_name, index, reg)
-        self.code.append(f"LOADI {reg}")
+        self.code.append(f"LOADI {reg} # load_link_T_at")
         if reg != '0':
             self.code.append(f"STORE {reg}")
 
@@ -870,10 +881,10 @@ class CodeGenerator:
     def load_link_T_address_at(self, array_name, index, reg=address_reg, reg_h='9'):
         if type(index) == int:
             address, index = self.procedure.get_address((array_name, index))
-            self.gen_const(address, reg_h)
+            self.code.append(f"LOAD {address}")
             self.code.append(f"STORE {reg_h}")
             self.gen_const(index, p_0)
-            self.code.append(f"ADD {reg_h}")
+            self.code.append(f"ADD {reg_h} # load_link_T_address_at int")
             if reg != p_0:
                 self.code.append(f"STORE {reg}")
             return
@@ -881,7 +892,6 @@ class CodeGenerator:
             raise Exception(f"Load_array_address_at_error")
         
         if index[1] in self.symbols and type(self.symbols[index[1]]) == Variable:
-            print(index[1])
             if not self.symbols[index[1]].isInitialized:
                 if not isStrict and self.loop_depth > 0:
                     print(f"Warning: Trying to use {array_name}[{index[1]}] where variable {index[1]} can be uninitialized")
@@ -890,14 +900,13 @@ class CodeGenerator:
             self.load_variable(index[1], reg_h)
             var = self.procedure.get_variable(array_name)
             self.code.append(f"LOAD {var.memory_offset}")
-            self.code.append(f"ADD {reg_h}")
+            self.code.append(f"ADD {reg_h} # load_link_T_address_at variable")
 
         elif index[1] in self.links and type(self.links[index[1]]) == Link:
             self.load_link_variable(index[1], reg_h)
             var = self.procedure.get_variable(array_name)
-            self.gen_const(var.memory_offset, '0')
-            self.code.append(f"LOAD {p_0}")
-            self.code.append(f"ADD {reg_h}")
+            self.code.append(f"LOAD {var.memory_offset}")
+            self.code.append(f"ADD {reg_h} # load_link_T_address_at link")
 
         if reg != '0':
             self.code.append(f"STORE {reg}")
@@ -906,7 +915,7 @@ class CodeGenerator:
     def load_link_variable(self, name, reg=value_reg, declared=True):
         if declared:
             address = self.procedure.get_address(name)
-            self.code.append(f"LOADI {address}")
+            self.code.append(f"LOADI {address} # load_link_variable")
             if reg != '0':
                 self.code.append(f"STORE {reg}")
         else:
@@ -916,7 +925,7 @@ class CodeGenerator:
     def load_link_address(self, name, reg=address_reg, declared=True):
         if declared:
             address = self.procedure.get_address(name)
-            self.code.append(f"LOAD {address}")
+            self.code.append(f"LOAD {address} # load_link_address")
             if reg != '0':
                 self.code.append(f"STORE {reg}")
         else:

@@ -1,9 +1,0 @@
-# Binarna postać liczby 
-PROGRAM IS
-	n, m, p
-BEGIN
-    READ n;
-	READ m;
-	p:=n*m;
-	WRITE p;
-END

@@ -15,9 +15,10 @@ class Array:
             raise Exception(f"Index {index} out of range for array {self.name}")
 
 class Variable:
-    def __init__(self, memory_offset, isInitialized=False):
+    def __init__(self, memory_offset, isInitialized=False, isIterator=False):
         self.memory_offset = memory_offset
         self.isInitialized = isInitialized
+        self.isIterator = isIterator
 
     def __repr__(self):
         return f"{'Uni' if not self.isInitialized else 'I'}nitialized variable at {self.memory_offset}"
@@ -69,7 +70,7 @@ class Procedure():
     def add_iterator(self, name):
         if name in self.symbols or name in self.links:
             return
-        self.symbols.setdefault(name, Variable(self.last_indeks, True))
+        self.symbols.setdefault(name, Variable(self.last_indeks, True, True))
         self.last_indeks += 2
 
     def add_array(self, name, left, right):

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Iterate over example files
-for file in examples2025/example*.imp; do
+for file in examples2025/program*.imp; do
     # Extract file name without path and extension
     filename=$(basename -- "$file")
     filename_noext="${filename%.*}"
